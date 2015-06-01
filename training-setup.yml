@@ -1,0 +1,82 @@
+---
+- hosts: localhost
+  connection: local
+  tasks:
+    - name: Instantiate the Control VM
+      nova_compute:
+        auth_url: "{{ os_auth_url }}"
+        # m1.tiny
+        flavor_id: "39d7540c-45b0-4167-a4c3-b7a1683d006f"
+        image_name: "Ubuntu-trusty-server-amd64"
+        key_name: "{{ os_key_name }}"
+        login_username: "{{ os_username }}"
+        login_password: "{{ os_password }}"
+        login_tenant_name: training
+        name: Training Control
+        state: present
+        security_groups: "default,Digile_to_SSH"
+        nics:
+          - net-id: "8d4868fc-669c-46ce-b50e-09d30f5961b1"
+        meta:
+          name: Training Control
+
+    - name: Associate floating IP to the Control VM
+      quantum_floating_ip:
+        auth_url: "{{ os_auth_url }}"
+        login_username: "{{ os_username }}"
+        login_password: "{{ os_password }}"
+        login_tenant_name: training
+        network_name: public
+        instance_name: Training Control
+      register: neutron
+
+    - name: Add the Control VM to the Ansible hosts list
+      add_host:
+        hostname: Training Control
+        ansible_ssh_user: ubuntu
+        ansible_ssh_host: "{{ item.public_ip }}"
+      with_items:
+        - "{{ neutron }}"
+
+    - name: Wait for the SSH server on the control VM
+      wait_for:
+        host: "{{ hostvars['Training Control']['ansible_ssh_host'] }}"
+        port: 22
+
+- hosts: Training Control
+  sudo: True
+  tasks:
+    - name: Install Openstack tools
+      apt:
+        name: "{{ item }}"
+        update_cache: yes
+        state: present
+      with_items:
+        - python-novaclient
+
+    - name: Create user accounts
+      user:
+        name: "{{ item }}"
+        password: "{{ lookup('pipe', 'mkpasswd %s --method=SHA-512' % item) }}"
+        shell: /bin/bash
+      with_lines: cat files/userlist | grep -v '#'
+
+    - name: Permit password login
+      lineinfile:
+        dest: "/etc/ssh/sshd_config"
+        regexp: "^PasswordAuthentication"
+        line: "PasswordAuthentication yes"
+      notify: restart sshd
+
+    - name: Upload the openrc.sh file
+      template:
+        src: files/training-openrc.sh
+        dest: "/home/{{ item }}/training-openrc.sh"
+        owner: "{{ item }}"
+        group: "{{ item }}"
+      with_lines: cat files/userlist | grep -v '#'
+  handlers:
+    - name: restart sshd
+      service:
+        name: ssh
+        state: restarted
