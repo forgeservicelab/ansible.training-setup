@@ -5,9 +5,11 @@
     - name: Instantiate the Control VM
       nova_compute:
         auth_url: "{{ os_auth_url }}"
+        floating_ip_pools:
+          - public
         # m1.tiny
         flavor_id: "39d7540c-45b0-4167-a4c3-b7a1683d006f"
-        image_name: "Ubuntu-trusty-server-amd64"
+        image_name: "{{ os_image_name }}"
         key_name: "{{ os_key_name }}"
         login_username: "{{ os_username }}"
         login_password: "{{ os_password }}"
@@ -19,24 +21,15 @@
           - net-id: "8d4868fc-669c-46ce-b50e-09d30f5961b1"
         meta:
           name: Training Control
-
-    - name: Associate floating IP to the Control VM
-      quantum_floating_ip:
-        auth_url: "{{ os_auth_url }}"
-        login_username: "{{ os_username }}"
-        login_password: "{{ os_password }}"
-        login_tenant_name: training
-        network_name: public
-        instance_name: Training Control
-      register: neutron
+      register: novaresult
 
     - name: Add the Control VM to the Ansible hosts list
       add_host:
         hostname: Training Control
-        ansible_ssh_user: ubuntu
+        ansible_ssh_user: "{{ ansible_ssh_user }}"
         ansible_ssh_host: "{{ item.public_ip }}"
       with_items:
-        - "{{ neutron }}"
+        - "{{ novaresult }}"
 
     - name: Wait for the SSH server on the control VM
       wait_for:
@@ -53,6 +46,10 @@
         state: present
       with_items:
         - python-novaclient
+        - python-virtualenv
+        - python-dev
+        - libssl-dev
+        - libffi-dev
 
     - name: Create user accounts
       user:
