@@ -1,0 +1,10 @@
+os_auth_url: "https://cloud.forgeservicelab.fi:5001/v2.0"
+os_key_name: 
+os_username: 
+os_password: 
+
+os_image_name: "Ubuntu-trusty-server-amd64"
+#os_image_name: "Debian-wheezy-server-amd64"
+
+ansible_ssh_user: ubuntu
+#ansible_ssh_user: debian

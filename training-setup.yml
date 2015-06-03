@@ -45,11 +45,7 @@
         update_cache: yes
         state: present
       with_items:
-        - python-novaclient
         - python-virtualenv
-        - python-dev
-        - libssl-dev
-        - libffi-dev
 
     - name: Create user accounts
       user:
